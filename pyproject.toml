@@ -1,0 +1,9 @@
+# HongYun 超级運維智能體（HongYun SuperOps） monorepo — dev tooling config (not a distributable package)
+[tool.pytest.ini_options]
+pythonpath = [
+  "packages/effect-ledger",
+  "packages/modelhub/src",
+  "packages/superops-cli/src",
+  "packages/ops-console/src",
+]
+testpaths = ["packages"]

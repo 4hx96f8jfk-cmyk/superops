@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!-- gate 页：输入 token 换 httpOnly cookie。品牌：HongYun → HongYun SuperOps -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HongYun SuperOps · 准入</title>
+<style>
+:root{--bg:#1a1a1a;--card:#232323;--fg:#eaeaea;--dim:#9a9a9a;
+--grad:linear-gradient(135deg,#C8102E,#E85D3D)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,"PingFang SC","Segoe UI",sans-serif;
+min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:var(--card);border:1px solid #333;border-radius:14px;padding:40px;width:min(400px,92vw)}
+.brand{font-weight:700;letter-spacing:.18em;font-size:12px;color:var(--dim)}
+.brand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-size:22px;margin:10px 0 4px}
+p.sub{color:var(--dim);font-size:13px;margin-bottom:24px}
+input{width:100%;padding:11px 12px;border-radius:8px;border:1px solid #3a3a3a;
+background:#151515;color:var(--fg);font-family:ui-monospace,monospace;font-size:14px}
+input:focus{outline:none;border-color:#E85D3D}
+button{margin-top:16px;width:100%;padding:11px;border:0;border-radius:8px;
+background:var(--grad);color:#fff;font-weight:600;font-size:15px;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+.err{color:#ff6b6b;font-size:13px;margin-top:12px;min-height:18px}
+.hint{margin-top:18px;font-size:12px;color:var(--dim)}
+.hint code{background:#151515;padding:2px 6px;border-radius:5px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><b>HONGYUN</b> · SUPEROPS</div>
+  <h1>超级運維智能體 · 准入</h1>
+  <p class="sub">输入会话 token 解锁控制台</p>
+  <input id="tok" type="password" placeholder="32 位 token" autocomplete="off" autofocus>
+  <button onclick="submitToken()">进入控制台</button>
+  <div class="err" id="err"></div>
+  <div class="hint">token 位于 <code>__TOKEN_PATH__</code></div>
+</div>
+<script>
+async function submitToken(){
+  const t=document.getElementById('tok').value.trim();
+  const e=document.getElementById('err');e.textContent='';
+  if(!t){e.textContent='请输入 token';return}
+  const r=await fetch('/api/token',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:t})});
+  if(r.ok){location.href='/'}else{e.textContent='token 无效，请重试'}
+}
+document.getElementById('tok').addEventListener('keydown',ev=>{if(ev.key==='Enter')submitToken()});
+</script>
+</body>
+</html>

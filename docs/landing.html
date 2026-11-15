@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SuperOps — 给你的 AI agent 一本「到底执行过没有」的账本 | HongYun</title>
+<meta name="description" content="SuperOps：agent 副作用可靠性与模型接入治理的运维层。语义层效果对账，不要求换框架。HongYun 出品，Apache-2.0 开源。">
+<style>
+  :root{
+    --bg:#0b0d12;
+    --bg2:#11141c;
+    --card:#161a24;
+    --line:#262c3a;
+    --text:#e8eaf0;
+    --muted:#9aa3b5;
+    --c1:#C8102E;
+    --c2:#E85D3D;
+    --grad:linear-gradient(90deg,#C8102E,#E85D3D);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  code,pre{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* nav */
+  header{position:sticky;top:0;z-index:10;background:rgba(11,13,18,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .logo{font-weight:800;font-size:20px;letter-spacing:.5px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .logo small{font-weight:500;color:var(--muted);-webkit-text-fill-color:var(--muted);margin-left:10px;font-size:13px}
+  nav .links a{color:var(--muted);text-decoration:none;margin-left:22px;font-size:14px}
+  nav .links a:hover{color:var(--text)}
+  @media(max-width:640px){nav .links{display:none}}
+
+  /* hero */
+  .hero{padding:96px 0 72px;text-align:center;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;top:-180px;left:50%;transform:translateX(-50%);width:720px;height:420px;
+    background:radial-gradient(ellipse at center,rgba(200,16,46,.22),transparent 65%);pointer-events:none}
+  .badge{display:inline-block;font-size:12.5px;color:var(--c2);border:1px solid rgba(232,93,61,.45);border-radius:999px;padding:4px 14px;margin-bottom:26px;letter-spacing:1px}
+  h1{font-size:clamp(30px,5.2vw,52px);line-height:1.25;font-weight:800;letter-spacing:-.5px}
+  h1 .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:clamp(15px,2vw,18px);max-width:680px;margin:22px auto 0}
+  .cta-row{margin-top:38px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:13px 30px;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none}
+  .btn-p{background:var(--grad);color:#fff}
+  .btn-p:hover{opacity:.9}
+  .btn-s{border:1px solid var(--line);color:var(--text);background:var(--bg2)}
+  .btn-s:hover{border-color:var(--c2)}
+  .term{max-width:640px;margin:48px auto 0;background:#0d1017;border:1px solid var(--line);border-radius:12px;text-align:left;overflow:hidden}
+  .term .bar{display:flex;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .term .bar i{width:11px;height:11px;border-radius:50%;background:#2c3342;display:block}
+  .term pre{padding:16px 18px;font-size:13.5px;color:#c7d0e0;overflow-x:auto}
+  .term .cm{color:#5c6880}
+  .term .p{color:var(--c2)}
+  .term .ok{color:#5dd39e}
+
+  /* sections */
+  section{padding:76px 0}
+  .kicker{font-size:13px;letter-spacing:2.5px;color:var(--c2);text-transform:uppercase;font-weight:700;margin-bottom:14px}
+  h2{font-size:clamp(24px,3.4vw,34px);font-weight:800;letter-spacing:-.3px}
+  .lead{color:var(--muted);max-width:720px;margin-top:14px;font-size:16px}
+
+  /* pain */
+  .pain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:36px}
+  .pain{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .pain .num{font-size:34px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pain h3{font-size:16.5px;margin:8px 0 8px}
+  .pain p{color:var(--muted);font-size:14.5px}
+
+  /* components */
+  .comp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:36px}
+  .comp{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;position:relative;overflow:hidden}
+  .comp::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad)}
+  .comp .pkg{font-size:12.5px;color:var(--c2);margin-bottom:10px}
+  .comp h3{font-size:19px;margin-bottom:10px}
+  .comp p{color:var(--muted);font-size:14.5px}
+  .comp ul{margin-top:12px;padding-left:18px;color:var(--muted);font-size:14px}
+  .comp li{margin:5px 0}
+
+  /* table */
+  .tbl-wrap{overflow-x:auto;margin-top:36px;border:1px solid var(--line);border-radius:14px}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:760px}
+  th,td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--bg2);font-weight:700;font-size:14px;white-space:nowrap}
+  td:first-child{color:var(--muted);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .yes{color:#5dd39e;font-weight:600}
+  .no{color:#e06c75}
+  .mid{color:#d9a441}
+  td.hl{background:rgba(200,16,46,.07)}
+  th.hl{background:rgba(200,16,46,.14)}
+
+  /* proof */
+  .proof-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:36px}
+  .proof{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
+  .proof .v{font-size:30px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .proof .k{color:var(--muted);font-size:13.5px;margin-top:6px}
+
+  /* cta */
+  .cta{background:linear-gradient(135deg,rgba(200,16,46,.16),rgba(232,93,61,.10));border:1px solid rgba(232,93,61,.35);border-radius:18px;padding:56px 32px;text-align:center;margin:20px 0 90px}
+  .cta h2{margin-bottom:14px}
+  .cta p{color:var(--muted);max-width:600px;margin:0 auto 30px}
+  .mail{font-size:18px;font-weight:700;color:var(--text);text-decoration:none;border-bottom:2px solid var(--c2)}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 40px;color:var(--muted);font-size:13.5px}
+  footer .row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <div class="logo">HongYun<small>SuperOps</small></div>
+      <div class="links">
+        <a href="#pain">问题</a>
+        <a href="#components">组件</a>
+        <a href="#compare">对比</a>
+        <a href="#proof">证据</a>
+        <a href="#cta">联系</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="badge">Apache-2.0 开源 · 即将发布</div>
+    <h1>给你的 AI agent 一本<br><span class="g">「到底执行过没有」</span>的账本</h1>
+    <p class="sub">agent 记得自己想干什么，不代表事情真的发生了。SuperOps 是 agent 副作用可靠性与模型接入治理的运维层——哪条命令跑过、哪封邮件发过、那次重试有没有扣两次钱，账本上写得清清楚楚。</p>
+    <div class="cta-row">
+      <a class="btn btn-p" href="#cta">联系我们</a>
+      <a class="btn btn-s" href="#components">看组件</a>
+    </div>
+    <div class="term">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <pre><span class="cm"># 即将发布到 PyPI</span>
+<span class="p">$</span> pip install superops
+<span class="p">$</span> superops init
+<span class="ok">✓</span> ledger ready (SQLite, zero external deps)</pre>
+    </div>
+  </div>
+</section>
+
+<section id="pain">
+  <div class="wrap">
+    <div class="kicker">The Problem</div>
+    <h2>重复下单、重复发信、重复扣款——2026 年最大的 agent 事故区</h2>
+    <p class="lead">checkpoint 让 agent「记住」，但记住不等于证明。状态快照回答不了「这条命令到底跑没跑过」。</p>
+    <div class="pain-grid">
+      <div class="pain">
+        <div class="num">1/4</div>
+        <h3>约四分之一的工具调用可能重复</h3>
+        <p>从业者实测：繁忙 agent 上约每 4 次工具调用就有 1 次可能重复。重试风暴一来，重复副作用成倍放大。</p>
+      </div>
+      <div class="pain">
+        <div class="num">≠</div>
+        <h3>记住 ≠ 执行过</h3>
+        <p>行业共识：checkpoint 存的是状态，不是执行证据。它不能证明哪条命令跑过、哪封邮件发过、重试会不会重复扣款。</p>
+      </div>
+      <div class="pain">
+        <div class="num">空档</div>
+        <h3>现有方案都没站在这个位置</h3>
+        <p>Temporal / Restate / DBOS 是基础设施层，得换运行时；LangGraph checkpoint 只存状态。语义层效果对账 + 不要求换框架，没人做。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="components" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="kicker">Components</div>
+    <h2>三个组件，一条红线</h2>
+    <p class="lead">不抢编排，只治理副作用。poller / 适配器形态，pip 装上就用，agent 框架任选。</p>
+    <div class="comp-grid">
+      <div class="comp">
+        <div class="pkg">effect-ledger</div>
+        <h3>效果账本</h3>
+        <p>副作用的记账系统。</p>
+        <ul>
+          <li>副作用登记 + 幂等键</li>
+          <li>租约 fencing，防并发重复执行</li>
+          <li>UNCERTAIN → 外部真值对账 → CONFIRMED / 转人工</li>
+          <li>全程审计事件，事后可回放</li>
+        </ul>
+      </div>
+      <div class="comp">
+        <div class="pkg">modelhub</div>
+        <h3>模型接入管理</h3>
+        <p>本地 + 云端大模型的统一入口。</p>
+        <ul>
+          <li>provider 注册表（OpenAI 兼容本地端点 + 云端 API）</li>
+          <li>健康探活走真实推理实测——自报绿 ≠ 实际绿</li>
+          <li>本地优先路由 + 回退链 + 并发闸</li>
+          <li>密钥只存引用，永不入库明文；用量统计</li>
+        </ul>
+      </div>
+      <div class="comp">
+        <div class="pkg">ops-console</div>
+        <h3>运维控制台</h3>
+        <p>账本的可视化界面。</p>
+        <ul>
+          <li>效果账本可视化 + DAG 视图</li>
+          <li>鉴权</li>
+          <li>红线：只读 + 白名单命令，绝不建第二调度器</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="kicker">Positioning</div>
+    <h2>和现有方案摆在一起看</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th class="hl">SuperOps</th>
+            <th>Temporal / Restate / DBOS</th>
+            <th>LangGraph checkpoint</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>层次</td>
+            <td class="hl">语义层效果对账</td>
+            <td>基础设施层持久执行引擎</td>
+            <td>框架内状态快照</td>
+          </tr>
+          <tr>
+            <td>必须换框架 / 运行时</td>
+            <td class="hl"><span class="yes">否</span>（pip 装上就用）</td>
+            <td><span class="no">是</span>（负载须迁入其运行时）</td>
+            <td><span class="no">是</span>（LangGraph 体系内）</td>
+          </tr>
+          <tr>
+            <td>能证明命令跑过 / 邮件发过</td>
+            <td class="hl"><span class="yes">能</span>（效果账本 + 真值对账）</td>
+            <td><span class="mid">仅其运行时内部</span></td>
+            <td><span class="no">不能</span>（只存状态）</td>
+          </tr>
+          <tr>
+            <td>结果不确定时</td>
+            <td class="hl">UNCERTAIN → 对账 → 确认 / 转人工</td>
+            <td>按自身重试语义处理</td>
+            <td><span class="no">无此概念</span></td>
+          </tr>
+          <tr>
+            <td>与你的编排共存</td>
+            <td class="hl"><span class="yes">不抢编排，只治理副作用</span></td>
+            <td>接管执行</td>
+            <td>绑定框架</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="proof" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="kicker">Proof</div>
+    <h2>生产里滚出来的，不是 demo</h2>
+    <p class="lead">内部 agent 舰队 dogfooding，核心逻辑从生产代码抽取。</p>
+    <div class="proof-grid">
+      <div class="proof"><div class="v">747</div><div class="k">测试用例</div></div>
+      <div class="proof"><div class="v">端到端</div><div class="k">崩溃恢复场景验证</div></div>
+      <div class="proof"><div class="v">0.00%</div><div class="k">影子执法误拦率（实测）</div></div>
+      <div class="proof"><div class="v">Apache-2.0</div><div class="k">核心全开源</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta" id="cta">
+      <h2>让你的 agent 开始记账</h2>
+      <p>核心组件即将发布到 PyPI。想提前试用、反馈场景，或聊集成——直接写信。</p>
+      <a class="mail" href="mailto:hongyun@hongyun.dev">hongyun@hongyun.dev</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div><span class="logo">HongYun</span> · 超级運維智能體</div>
+      <div>Apache-2.0 · hongyun@hongyun.dev</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

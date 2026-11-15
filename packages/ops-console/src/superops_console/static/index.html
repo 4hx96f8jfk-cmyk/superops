@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<!-- HongYun SuperOps 主控制台：单文件无构建链，fetch /api/*。深色 #1a1a1a + 品牌渐变。
+     read-only 模式下写按钮禁用并提示；full 模式开放 reconcile / resolve。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HongYun SuperOps · 运维控制台</title>
+<style>
+:root{--bg:#1a1a1a;--card:#222;--line:#333;--fg:#eaeaea;--dim:#9a9a9a;
+--grad:linear-gradient(135deg,#C8102E,#E85D3D);--ok:#3ecf8e;--warn:#e8b93d;--bad:#ff6b6b}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,"PingFang SC","Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);
+position:sticky;top:0;background:#1a1a1acc;backdrop-filter:blur(8px);z-index:5}
+.brand{font-weight:700;letter-spacing:.18em;font-size:12px;color:var(--dim)}
+.brand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-size:17px;font-weight:600}
+.badge{margin-left:auto;font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--line)}
+.badge.ro{color:var(--warn)}.badge.full{color:var(--ok)}
+main{max-width:1100px;margin:0 auto;padding:20px 24px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:18px 20px;margin-bottom:18px}
+h2{font-size:14px;margin-bottom:12px;color:#fff}
+h2 span{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--dim);text-align:left;font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid #2b2b2b;vertical-align:top}
+tr:hover td{background:#262626}
+.st{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;
+display:inline-block;border:1px solid transparent}
+/* 状态色编码（M3）：CONFIRMED 绿 / UNCERTAIN 黄 / PAUSED 红 / REJECTED 灰 */
+.st.CONFIRMED{color:#0d3323;background:var(--ok)}
+.st.UNCERTAIN{color:#3a2e05;background:var(--warn)}
+.st.PAUSED{color:#fff;background:var(--bad)}
+.st.REJECTED{color:#ddd;background:#555;border-color:#666}
+.st.EXECUTING{color:#06253f;background:#6ab0ff}
+button{background:var(--grad);color:#fff;border:0;border-radius:6px;
+padding:4px 12px;font-size:12px;cursor:pointer}
+button.gray{background:#3a3a3a}
+button:disabled{opacity:.35;cursor:not-allowed}
+.empty{color:var(--dim);font-size:13px;padding:8px 0}
+select{background:#151515;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+pre{background:#151515;border:1px solid var(--line);border-radius:8px;padding:10px;
+font-size:12px;overflow:auto;max-height:260px;white-space:pre-wrap}
+.note{font-size:12px;color:var(--dim);margin-top:8px}
+/* 顶部计数卡（G4）：待处理 / UNCERTAIN / PAUSED */
+.statCards{display:flex;gap:14px;margin-bottom:18px}
+.statCard{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:14px 18px;text-align:center}
+.statNum{font-size:26px;font-weight:700;background:var(--grad);
+-webkit-background-clip:text;background-clip:text;color:transparent}
+.statCard.warn .statNum{color:var(--warn);background:none;-webkit-text-fill-color:var(--warn)}
+.statCard.bad .statNum{color:var(--bad);background:none;-webkit-text-fill-color:var(--bad)}
+.statLbl{font-size:12px;color:var(--dim);margin-top:2px}
+kbd{background:#151515;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;
+padding:0 5px;font-size:11px;font-family:inherit}
+#toast{position:fixed;bottom:24px;right:24px;background:#2c2c2c;border:1px solid var(--line);
+border-radius:8px;padding:10px 16px;font-size:13px;display:none}
+/* ---- 页签（总览 / 账本图 / 审计链）---- 窄屏可横滑（P2 G6） */
+nav.tabs{display:flex;gap:4px;max-width:1100px;margin:14px auto 0;padding:0 24px;
+overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:none;white-space:nowrap}
+nav.tabs button{background:transparent;color:var(--dim);border:1px solid var(--line);
+border-bottom:0;border-radius:8px 8px 0 0;padding:7px 18px;font-size:13px}
+nav.tabs button.on{background:var(--card);color:#fff;border-color:var(--line);
+box-shadow:inset 0 2px 0 #C8102E}
+.tabpage{display:none}
+/* ---- G1 账本图 ---- */
+.graphWrap{display:flex;gap:14px;align-items:stretch}
+#intentList{width:230px;flex:none;max-height:560px;overflow:auto}
+.intentItem{padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;
+cursor:pointer;font-size:12px}
+.intentItem:hover{background:#262626}
+.intentItem.sel{border-color:#C8102E;background:#262626}
+.intentName{font-weight:600;word-break:break-all}
+.intentMeta{color:var(--dim);margin:2px 0 4px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+#graphStage{flex:1;min-width:0;position:relative}
+#graphCanvas{height:560px;border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative}
+#graphFallback{display:none}
+/* P2 自绘 minimap（右下角缩览，点击/拖拽跳转视口） */
+.x6-minimap{position:absolute;right:10px;bottom:10px;background:#000000b3;border:1px solid var(--line);
+border-radius:8px;z-index:4;cursor:crosshair;overflow:hidden;line-height:0}
+.x6-minimap canvas{display:block}
+.fbItem{padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:13px}
+#panel{display:none;position:absolute;top:10px;right:10px;width:300px;max-height:540px;overflow:auto;
+background:#1e1e1e;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;
+box-shadow:0 8px 28px #000a}
+#panel h4{font-size:12px;color:var(--dim);margin:10px 0 4px;font-weight:500}
+#panel pre{max-height:150px}
+.panelActions{display:flex;gap:8px;margin-top:10px}
+/* ---- G2 审计链 ---- */
+.chainBanner{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px;border:1px solid}
+.chainBanner.ok{color:var(--ok);border-color:#245c44;background:#16281f}
+.chainBanner.bad{color:var(--bad);border-color:#6b3030;background:#2a1a1a}
+.tlItem{display:flex;gap:12px;position:relative;padding-bottom:16px}
+.tlItem::before{content:"";position:absolute;left:5px;top:14px;bottom:-2px;width:2px;background:var(--line)}
+.tlItem:last-child::before{display:none}
+.tlDot{flex:none;width:12px;height:12px;border-radius:50%;background:#6ab0ff;margin-top:3px;z-index:1}
+.tlItem.broken .tlDot{background:var(--bad)}
+.tlItem.broken .tlBody{border:1px solid var(--bad);border-radius:8px;padding:6px 10px}
+.tlBody{min-width:0;font-size:13px}
+.tlPre{max-height:110px;margin:4px 0}
+/* ---- G3 模型接入 / G4 趋势图 ---- */
+#topoCanvas{height:320px;border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative}
+#topoFallback{display:none}
+.chartBox{height:280px;width:100%}
+.mhGuide{display:none;border:1px dashed #555;border-radius:10px;padding:16px 18px;font-size:13px;
+color:var(--dim);line-height:1.8}
+.mhGuide b{color:#fff}
+/* 窄屏降级（G6）：账本图收起画布改列表，侧栏改底部抽屉（P2 bottom sheet） */
+@media (max-width:760px){
+  header{flex-wrap:wrap;gap:8px;padding:10px 12px}
+  header h1{font-size:15px}
+  .graphWrap{flex-direction:column}
+  #intentList{width:auto;max-height:220px}
+  #graphCanvas{display:none}
+  #graphFallback{display:block}
+  #topoCanvas{display:none}
+  #topoFallback{display:block}
+  .chartBox{height:clamp(200px,58vw,260px);min-width:0}
+  /* 侧栏 → 底部抽屉：fixed 贴底、自带关闭钮与操作钮，不遮页面其他操作 */
+  #panel{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-height:62vh;
+  margin:0;border-radius:16px 16px 0 0;border-bottom:0;box-shadow:0 -8px 30px #000c;z-index:30;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+  #panel .panelActions button{padding:9px 16px;font-size:13px}
+  #panelClose{padding:8px 14px;font-size:14px}
+  /* 宽表格内部横滚，文档不出现横向滚动条 */
+  #pending,#effects,#usage,#audit,#auditTimeline{overflow-x:auto;max-width:100%}
+  .statCards{flex-direction:row;gap:8px}
+  .statCard{padding:10px 8px}
+  .statNum{font-size:20px}
+  nav.tabs{padding:0 12px}
+  main{padding:16px 12px 40px}
+  section{padding:14px 14px;max-width:100%}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>HONGYUN</b> · SUPEROPS</div>
+  <h1>超级運維智能體 · 运维控制台</h1>
+  <span class="badge" id="pendingBadge" title="待处理（UNCERTAIN + PAUSED）" style="display:none"></span>
+  <button class="gray" id="pollBtn" onclick="togglePoll()" title="10 秒自动刷新">⏸ 暂停刷新</button>
+  <span class="badge" id="modeBadge">…</span>
+</header>
+<nav class="tabs">
+  <button id="tabBtn-overview" class="on" onclick="switchTab('overview')">总览</button>
+  <button id="tabBtn-graph" onclick="switchTab('graph')">账本图</button>
+  <button id="tabBtn-audit" onclick="switchTab('audit')">审计链</button>
+  <button id="tabBtn-model" onclick="switchTab('model')">模型接入</button>
+  <button id="tabBtn-security" onclick="switchTab('security')">安全中心</button>
+</nav>
+<main>
+<div id="tab-overview" class="tabpage" style="display:block">
+<div id="statCards" class="statCards"></div>
+<section><h2>待处理 <span>UNCERTAIN + PAUSED</span></h2>
+  <div id="pending"><div class="empty">加载中…</div></div></section>
+<section><h2>账本趋势 <span>按日桶 · /api/stats/trend</span></h2>
+  <div id="trendChart" class="chartBox"></div></section>
+<section><h2>效果账本 <span>effects</span>
+  <select id="stateFilter" onchange="loadEffects()" style="float:right">
+    <option value="">全部状态</option><option>EXECUTING</option><option>CONFIRMED</option>
+    <option>UNCERTAIN</option><option>PAUSED</option></select></h2>
+  <div id="effects"><div class="empty">加载中…</div></div></section>
+<section><h2>模型用量 <span>modelhub 按日聚合</span></h2>
+  <div id="usage"><div class="empty">加载中…</div></div></section>
+<section><h2>控制台操作审计 <span>console_audit</span></h2>
+  <div id="audit"><div class="empty">加载中…</div></div></section>
+<section><h2>审计链详情 <span>点击行内「详情」查看单条 intent 的 audit_log</span></h2>
+  <pre id="detail">（未选择）</pre></section>
+</div><!-- /tab-overview -->
+
+<div id="tab-graph" class="tabpage">
+<section><h2>账本图 <span>intent→step 因果 DAG · 点节点看详情并图上裁决</span>
+  <button class="gray" id="resetLayoutBtn" style="float:right" title="清除本图位置缓存，回到 dagre 自动布局">重置布局</button></h2>
+  <div class="graphWrap">
+    <div id="intentList"><div class="empty">加载中…</div></div>
+    <div id="graphStage">
+      <div id="graphCanvas"></div>
+      <div id="graphFallback"></div>
+      <aside id="panel"></aside>
+    </div>
+  </div>
+  <div class="note">节点色 = 状态：绿 CONFIRMED · 黄 UNCERTAIN · 红 PAUSED · 灰 REJECTED · 蓝 EXECUTING。
+  滚轮（Ctrl/⌘+滚轮）缩放，拖拽平移；节点可拖动，位置自动记住（「重置布局」回自动排布）。
+  快捷键：<kbd>Esc</kbd>/<kbd>Delete</kbd> 关侧栏 · <kbd>+/-</kbd> 缩放 · <kbd>0</kbd> 复位 · 方向键平移。右下角为缩览图，点击跳转。
+  窄屏自动降级为列表。</div>
+</section>
+</div><!-- /tab-graph -->
+
+<div id="tab-audit" class="tabpage">
+<section><h2>审计哈希链 <span>console_audit · /api/audit/verify 联动</span></h2>
+  <div class="chainBanner" id="chainBanner">校验中…</div>
+  <div id="auditTimeline"><div class="empty">加载中…</div></div>
+</section>
+</div><!-- /tab-audit -->
+
+<div id="tab-model" class="tabpage">
+<section id="mhGuidance" class="mhGuide">
+  <b>modelhub 未配置</b><br><span id="mhGuidanceText"></span><br>
+  配置完成后刷新本页即可看到 provider 拓扑与成本图表。
+</section>
+<section id="topoSection" style="display:none"><h2>provider 路由链 <span>主→回退顺序 · 节点色=真实探活健康</span>
+  <button class="gray" id="resetTopoBtn" style="float:right" title="清除拓扑位置缓存，回到默认排布">重置布局</button></h2>
+  <div id="topoCanvas"></div>
+  <div id="topoFallback"></div>
+  <div class="note">节点色 = probe_cache 最新真实探活：绿 健康 · 红 宕机/推理失败 · 灰 未探活/已过期（禁止自报绿）。
+  边标注 = 该 provider 的 timeout 配置。滚轮（Ctrl/⌘+滚轮）缩放，拖拽平移；节点可拖动，位置自动记住。
+  快捷键：<kbd>+/-</kbd> 缩放 · <kbd>0</kbd> 复位 · 方向键平移。窄屏自动降级为列表。</div>
+</section>
+<section id="chartsSection" style="display:none"><h2>成本 · 按 provider <span>/api/usage/cost · cost_summary 口径</span></h2>
+  <div id="costChart" class="chartBox"></div></section>
+<section id="usageTrendSection" style="display:none"><h2>用量趋势 · 按日调用 <span>/api/usage/cost daily</span></h2>
+  <div id="usageTrendChart" class="chartBox"></div></section>
+</div><!-- /tab-model -->
+
+<div id="tab-security" class="tabpage">
+<section id="secGuide" class="mhGuide">
+  <b>安全中心未就绪</b><br><span id="secGuideText" style="white-space:pre-line"></span><br>
+  配置完成后刷新本页即可看到 Wazuh 舰队状态与高危告警。
+</section>
+<section id="secFleetSection" style="display:none"><h2>Wazuh 舰队 <span>agents 状态 · /api/security/fleet</span></h2>
+  <div id="secCards" class="statCards"></div>
+  <div id="secAgents"><div class="empty">加载中…</div></div>
+</section>
+<section id="secAlertsSection" style="display:none"><h2><span id="secAlertsTitle" style="color:#fff;font-size:14px;font-weight:600">高危告警</span>
+  <span>/api/security/alerts · 纯只读</span></h2>
+  <div id="secAlerts"><div class="empty">加载中…</div></div>
+</section>
+<div class="note">数据源：Wazuh Manager API + Indexer（wazuh-alerts-*），服务端只读代理，
+凭据仅服务端持有、不下发浏览器。级别色标：蓝 Lv.7 · 黄 Lv.8~11 · 红 Lv.12+。</div>
+</div><!-- /tab-security -->
+</main>
+<div id="toast"></div>
+<!-- vendored 图形库（UMD，sha256 钉死于 vendor-manifest.json，无构建链） -->
+<script src="/static/vendor/x6.min.js"></script>
+<script src="/static/vendor/dagre.min.js"></script>
+<script src="/static/vendor/echarts.min.js"></script>
+<script type="module" src="/static/js/graph.js"></script>
+<script type="module" src="/static/js/audit.js"></script>
+<script type="module" src="/static/js/charts.js"></script>
+<script type="module" src="/static/js/model.js"></script>
+<script type="module" src="/static/js/security.js"></script>
+<script>
+let MODE='read-only';
+const $=id=>document.getElementById(id);
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';
+  setTimeout(()=>t.style.display='none',2600)}
+async function api(path,opts={}){
+  const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opts});
+  if(r.status===401){location.href='/gate';throw new Error('401')}
+  return r;
+}
+function fmt(t){return new Date(t*1000).toLocaleString('zh-CN')}
+function esc(s){return String(s??'').replace(/[&<>"'\\]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','\\':'&#92;'}[c]))}
+// P1 XSS 双保险：esc 补转义单引号与反斜杠（JS 字符串上下文），且操作按钮
+// 一律 data-iid 属性 + 事件委托（照 graph.js 模式），不再把 id 拼进 onclick。
+function rowHtml(e,actions){
+  return `<tr><td><code>${esc(e.intent_id)}</code></td>
+  <td><span class="st ${esc(e.state)}">${esc(e.state)}</span></td>
+  <td>${esc(e.task_id)} / ${esc(e.step_id)}</td>
+  <td>${esc(e.risk)}</td><td>${fmt(e.updated_at)}</td>
+  <td style="white-space:nowrap">
+    <button class="gray" data-act="detail" data-iid="${esc(e.intent_id)}">详情</button>
+    ${actions||''}</td></tr>`;
+}
+async function loadMode(){
+  const d=await(await api('/api/mode')).json();MODE=d.mode;
+  const b=$('modeBadge');b.textContent=MODE==='full'?'full · 全功能':'read-only · 只读';
+  b.className='badge '+(MODE==='full'?'full':'ro');
+}
+async function loadPending(){
+  const d=await(await api('/api/pending')).json();
+  const rows=[...d.uncertain,...d.paused];
+  // 顶部计数卡（G4）：待处理 / UNCERTAIN / PAUSED，消费 /api/pending 已有 counts
+  const c=d.counts||{uncertain:0,paused:0};
+  $('statCards').innerHTML=
+    `<div class="statCard"><div class="statNum">${c.uncertain+c.paused}</div><div class="statLbl">待处理</div></div>
+     <div class="statCard warn"><div class="statNum">${c.uncertain}</div><div class="statLbl">UNCERTAIN</div></div>
+     <div class="statCard bad"><div class="statNum">${c.paused}</div><div class="statLbl">PAUSED</div></div>`;
+  // pending 数角标：有积压时红色醒目，清零后隐藏
+  const pb=$('pendingBadge'), n=rows.length;
+  if(n){pb.style.display='';pb.textContent='待处理 '+n;
+    pb.style.borderColor='var(--bad)';pb.style.color='var(--bad)'}
+  else{pb.style.display='none';pb.textContent=''}
+  $('pending').innerHTML=rows.length?
+    `<table><tr><th>intent</th><th>状态</th><th>任务/步骤</th><th>风险</th><th>更新</th><th>操作</th></tr>${
+    rows.map(e=>rowHtml(e,MODE==='full'?
+      (e.state==='PAUSED'
+        ?`<button data-act="resolve" data-iid="${esc(e.intent_id)}" data-action="approve">放行</button> <button class="gray" data-act="resolve" data-iid="${esc(e.intent_id)}" data-action="reject">驳回</button>`
+        :`<button data-act="reconcile" data-iid="${esc(e.intent_id)}">对账</button>`):'')).join('')}</table>`
+    :'<div class="empty">没有待处理项 ✓</div>';
+}
+async function loadEffects(){
+  const s=$('stateFilter').value;
+  const d=await(await api('/api/effects?limit=100'+(s?`&state=${s}`:''))).json();
+  $('effects').innerHTML=d.count?
+    `<table><tr><th>intent</th><th>状态</th><th>任务/步骤</th><th>风险</th><th>更新</th><th>操作</th></tr>${
+    d.items.map(e=>rowHtml(e)).join('')}</table>`:'<div class="empty">（空）</div>';
+}
+async function loadUsage(){
+  const d=await(await api('/api/usage')).json();
+  if(!d.available){$('usage').innerHTML='<div class="empty">未配置 modelhub 数据库</div>';return}
+  $('usage').innerHTML=d.items.length?
+    `<table><tr><th>日期</th><th>provider</th><th>model</th><th>调用</th><th>失败</th><th>输入tok</th><th>输出tok</th></tr>${
+    d.items.map(r=>`<tr><td>${esc(r.day)}</td><td>${esc(r.provider)}</td><td>${esc(r.model)}</td>
+    <td>${r.calls}</td><td>${r.error_calls}</td><td>${r.prompt_tokens??0}</td><td>${r.completion_tokens??0}</td></tr>`).join('')}</table>`
+    :'<div class="empty">（暂无用量记录）</div>';
+}
+async function loadAudit(){
+  const d=await(await api('/api/audit?limit=50')).json();
+  $('audit').innerHTML=d.items.length?
+    `<table><tr><th>时间</th><th>who</th><th>动作</th><th>intent</th><th>参数</th></tr>${
+    d.items.map(r=>`<tr><td>${fmt(r.at)}</td><td>${esc(r.who)}</td><td>${esc(r.what)}</td>
+    <td><code>${esc(r.intent_id||'')}</code></td><td>${esc(r.params||'')}</td></tr>`).join('')}</table>`
+    :'<div class="empty">（暂无操作）</div>';
+}
+async function showDetail(iid){
+  const d=await(await api('/api/effects/'+encodeURIComponent(iid))).json();
+  $('detail').textContent=JSON.stringify(d,null,2);
+}
+// 事件委托（P1 XSS）：操作按钮全部 data-act/data-iid 属性化，id 不进 JS 字符串
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('button[data-act]');
+  if(!b)return;
+  const act=b.dataset.act,iid=b.dataset.iid;
+  if(act==='detail')showDetail(iid);
+  else if(act==='reconcile')reconcile(iid);
+  else if(act==='resolve')resolve(iid,b.dataset.action);
+});
+async function reconcile(iid){
+  if(MODE!=='full'){toast('read-only 模式禁止写操作');return}
+  const r=await api('/api/reconcile',{method:'POST',body:JSON.stringify({intent_id:iid})});
+  toast((await r.json()).action||r.status);refresh();
+}
+async function resolve(iid,action){
+  if(MODE!=='full'){toast('read-only 模式禁止写操作');return}
+  const note=action==='approve'?'控制台人工放行':'控制台人工驳回';
+  const r=await api('/api/resolve',{method:'POST',
+    body:JSON.stringify({intent_id:iid,action,note})});
+  toast((await r.json()).action||r.status);refresh();
+}
+function refresh(){loadPending();loadEffects();loadUsage();loadAudit();if(window.loadTrend)window.loadTrend()}
+// 页签切换：总览=既有表格视图+G4 趋势；账本图=G1；审计链=G2；模型接入=G3；安全中心=B4（模块懒激活）
+let CUR_TAB='overview';
+function switchTab(name){
+  CUR_TAB=name;
+  for(const t of ['overview','graph','audit','model','security']){
+    $('tab-'+t).style.display=(t===name)?'block':'none';
+    $('tabBtn-'+t).className=(t===name)?'on':'';
+  }
+  if(name==='graph'&&window.__graphActivate)window.__graphActivate();
+  if(name==='audit'&&window.__auditActivate)window.__auditActivate();
+  if(name==='model'&&window.__modelActivate)window.__modelActivate();
+  if(name==='security'&&window.__securityActivate)window.__securityActivate();
+  if(name==='overview'&&window.loadTrend)window.loadTrend();  // 隐藏期宽度 0，切回重画
+}
+window.refreshOverview=refresh;  // 供 graph.js 图上裁决后同步刷新总览
+// 10s 自动轮询（M3）：可暂停；页面隐藏时跳过本轮省流量
+let pollTimer=null;
+function togglePoll(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;$('pollBtn').textContent='▶ 开始刷新'}
+  else{pollTimer=setInterval(()=>{if(!document.hidden)refresh();$('pollBtn').textContent='⏸ 暂停刷新'},10000);
+    $('pollBtn').textContent='⏸ 暂停刷新'}
+}
+loadMode().then(()=>{refresh();togglePoll()});  // 默认开启自动刷新
+</script>
+</body>
+</html>

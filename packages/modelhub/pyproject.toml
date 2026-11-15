@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hongyun-modelhub"
+version = "0.1.0"
+description = "HongYun 超级運維智能體（HongYun SuperOps） — 本地+云端大模型接入治理（provider 注册/真实探活/路由回退/密钥引用/用量统计）"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "HongYun", email = "hongyun@hongyun.dev" }]
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

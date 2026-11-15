@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superops-console"
+version = "0.1.0"
+description = "HongYun 超级運維智能體（HongYun SuperOps）运维控制台 —— 效果账本可视化 + 双模式（read-only / full）运维操作，全审计留痕"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "effect-ledger>=0.1.0",
+]
+
+[project.optional-dependencies]
+modelhub = ["modelhub>=0.1.0"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+superops-console = "superops_console.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+superops_console = ["static/*.html"]

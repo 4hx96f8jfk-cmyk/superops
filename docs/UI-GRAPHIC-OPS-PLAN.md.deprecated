@@ -1,0 +1,108 @@
+# 界面图形操作能力实现方案（UI-GRAPHIC-OPS-PLAN）
+
+- 编号：SUP-GUI-20261113 · 版本 v1.0 · 状态 **PROPOSED（方案已立，P0 可即刻开工）**
+- 上游：docs/PRODUCT.md（红线）、docs/WORKPLAN.md（M3 前端项）
+- 本方案是 ops-console 图形操作能力的**唯一规范实例**：任何架构偏离先改本方案（附变更记录）再改代码
+
+## 1. 现状盘点（VERIFIED_LAB，2026-11-13 实测）
+
+| 资产     | 实况                                                                                                   | 状态         |
+| -------- | ------------------------------------------------------------------------------------------------------ | ------------ |
+| 前端     | `static/index.html` 168 行 vanilla JS + `gate.html` 令牌门                                             | VERIFIED_LAB |
+| 图形库   | **零**（无 d3/echarts/图编辑引擎，纯表格+色块）                                                        | VERIFIED_LAB |
+| 构建链   | 无（FastAPI 直出静态文件，pip 装完即用）                                                               | VERIFIED_LAB |
+| 数据面   | `/api/mode` `/api/pending` `/api/effects` `/api/usage` `/api/audit/verify` `/api/token` + full 模式 resolve/reconcile/probe-all 写操作  | VERIFIED_LAB |
+| 交互短板 | 账本平铺表格看不出 intent→step 因果；审计哈希链不可见；provider 拓扑/成本不可见；裁决操作靠表单点选 id | VERIFIED_LAB |
+
+## 2. 图形操作能力需求（G1~G6）
+
+「图形操作」定义：**在图上直接完成运维动作**（点节点出侧栏→批准/驳回/重试），不是把表格画得好看。
+
+| #   | 能力               | 说明                                                                                                                                                                                      |
+| --- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | 效果账本 DAG       | intent→step 因果图，dagre 自动布局，状态色编码（CONFIRMED 绿/UNCERTAIN 黄/PAUSED 红/REJECTED 灰/EXECUTING 蓝）；点节点→侧栏详情→**图上直接裁决**（approve/reject/retry，full 模式）。**实现回填**：event 层（audit_log 事件流）以侧栏「事件流」面板呈现，不占图节点——图上只画 task/step 两级，事件是节点的属性而非节点，避免图规模随事件数膨胀 |
+| G2  | 审计哈希链可视化   | 时间线视图 + 链校验状态（verify 端点绿链/断点红标，点击断点定位被篡改行）                                                                                                                 |
+| G3  | modelhub 拓扑+成本 | provider 路由链图（探活健康色+延迟标注）+ 用量/成本图表（按 provider 聚合，来自 M2 cost_summary）                                                                                         |
+| G4  | 总览仪表盘         | 计数卡（pending/uncertain/paused）+ 趋势折线（ECharts）                                                                                                                                   |
+| G5  | 画布操作           | 缩放/平移/拖拽布局、minimap、键盘快捷键（Esc 取消、Del 关面板）                                                                                                                           |
+| G6  | 移动端不破版       | 维持既有约束：窄屏降级为列表视图                                                                                                                                                          |
+
+## 3. 方案调研对比（2026-11-13 实测下载 + 生态调研）
+
+| 方案                     | License      | 无构建可用             | 体积(实测) | 强项                                                                | 弱项                           | 推荐度               |
+| ------------------------ | ------------ | ---------------------- | ---------- | ------------------------------------------------------------------- | ------------------------------ | -------------------- |
+| **AntV X6 3.1.8**        | MIT          | ✅ UMD `dist/index.js` | 484K       | 图**编辑**引擎：DAG/端口/minimap/undo/中文文档，专为 DAG 类应用设计 | 纯统计图不行（需配 ECharts）   | ⭐⭐⭐⭐⭐           |
+| **Apache ECharts 6.1.0** | Apache-2.0   | ✅ UMD                 | 1.1M       | 图表全家桶（折线/柱/桑基/graph 序列）                               | 图编辑交互弱                   | ⭐⭐⭐⭐⭐（图表位） |
+| dagre 0.8.5              | MIT          | ✅ UMD                 | 280K       | 分层自动布局（DAG 标配）                                            | 只管布局                       | ⭐⭐⭐⭐⭐（配套）   |
+| Cytoscape.js 3.30        | MIT          | ✅ UMD                 | 368K       | 图算法（最短路/中心性）                                             | 编辑 UX 一般，中文资料少       | ⭐⭐⭐（备选）       |
+| React Flow 12.x          | MIT          | ❌ 需 React+npm 构建   | —          | React 生态 DAG 事实标准                                             | 撞「无构建链」红线             | ⭐⭐                 |
+| vis-network              | MIT/GPL 双   | ✅                     | ~600K      | 力导向图                                                            | 编辑能力平庸，维护慢           | ⭐⭐                 |
+| D3 直写                  | ISC          | ✅                     | 280K       | 无上限定制                                                          | 开发成本最高，DAG 交互全手搓   | ⭐⭐                 |
+| Mermaid                  | MIT          | ✅                     | 1M+        | 文本→静态图                                                         | **无交互**，点不动节点         | ⭐                   |
+| GoJS                     | **商业收费** | ✅                     | —          | 功能全                                                              | 红线排除（开源产品禁商业依赖） | ⭐                   |
+
+**结论**：X6（图编辑）+ ECharts（统计图表）+ dagre（布局）三件套，全部 UMD 实测可下载（scratch 探针 4/4 通过），全部宽松 License，全部中文友好。
+
+## 4. 推荐架构：无构建链 + vendored 三件套
+
+```
+浏览器
+  │  <script src="/static/vendor/x6.js">          (484K, MIT)
+  │  <script src="/static/vendor/echarts.min.js"> (1.1M, Apache-2.0)
+  │  <script src="/static/vendor/dagre.min.js">   (280K, MIT)
+  ▼
+FastAPI ops-console ── 静态直出 static/{index.html, vendor/, js/}
+  │  图形操作 = 调既有 REST（图上按钮 → POST resolve，与表单同一端点）
+  │  P1 新增聚合端点: GET /api/graph/intent/<id> · /api/providers/topology · /api/usage/cost
+  ▼
+effect-ledger / modelhub（写路径照旧过账本+审计，图形层零特权）
+```
+
+**四条架构原则**：
+
+1. **不引入 npm 构建链**——开源用户 `pip install` 即用；无 node_modules 供应链面；升级库=换文件+改 sha256 manifest，变更可审计
+2. **vendored 进包**——三库落 `static/vendor/`，版本+sha256 钉死记入 `vendor-manifest.json`（防乱改：CI/doctor 校验哈希）
+3. **图形操作零特权**——图上每个按钮都走既有 API + token 门 + 限流 + 审计；read-only 模式下图形只读、操作按钮禁用（403 反例测试保留）
+4. **vanilla JS 模块化**——`static/js/` 实际五模块（回填为实况）：`graph.js`（G1 账本 DAG）、`audit.js`（G2 审计链时间线）、`charts.js`（G4 趋势图）、`model.js`（G3 provider 拓扑+成本图）、`layout.js`（共享：拖拽持久化/minimap/快捷键），全部 ES modules（浏览器原生，仍无构建）
+
+## 5. 分期计划（P0→P2）
+
+> 交付状态（2026-11-13）：P0 ✅ VERIFIED_LAB（提交 25abf98）· P1 ✅ VERIFIED_LAB（提交 b641902）· P2 ✅ VERIFIED_LAB（拖拽持久化/自绘 minimap/快捷键/375px 底部抽屉，浏览器实测通过）
+
+### P0 · 图形操作核心（本批，1 个工单）
+
+- vendor 三件套落库 + `vendor-manifest.json`（sha256）+ doctor 校验项
+- G1 账本 DAG：intent 列表→点开进图；节点状态色；点节点→侧栏（payload/事件流）→图上 approve/reject/retry（复用现有 resolve API）
+- G2 审计链时间线 + verify 可视化（断点红标）
+- **AC**：pytest TestClient 断言新端点契约；浏览器无头实测截图（DAG 渲染+图上裁决成功+read-only 按钮禁用）；全仓 pytest 无破坏
+
+### P1 · 拓扑与图表
+
+- G3 provider 拓扑图 + 成本/用量图表（后端补 3 个聚合端点）；G4 仪表盘
+- **AC**：成本图数字与 `cost_summary()` 手算一致；拓扑探活色与 probe 实测一致（禁自报绿）
+
+### P2 · 画布体验
+
+- G5 拖拽位置持久化（localStorage）、minimap、快捷键；G6 移动端列表降级精修
+- **AC**：拖拽后刷新位置保持；窄屏 375px 不破版
+
+## 6. 本方案不解决什么（欠账声明）
+
+- **实时推送**：维持 10s 轮询；SSE 推送是候选项，本方案不承诺
+- **大图性能**：账本规模假设百~千节点；>10k 节点渲染不在范围（真到了再立 v2）
+- **前端框架化**：若 P1 后 vanilla 撑不住要上 Vite+React，属架构偏离——先改本方案再动代码，禁止直接塞构建链
+- **第二调度器**：图形层只读+受控命令，绝不从图上发起新调度（PRODUCT.md 红线）
+
+## 7. 安全五原则映射（继承 fact 254 清单）
+
+| 原则                   | 本方案落点                                                        |
+| ---------------------- | ----------------------------------------------------------------- |
+| Default Deny           | 图上写操作仅 full 模式；read-only 全禁用                          |
+| Least Privilege        | 图形层零特权，复用既有端点零新增写面（P1 聚合端点全只读）         |
+| Audit Everything       | 图上裁决与表单裁决落同一条 console_audit 哈希链                   |
+| Recoverability         | vendor 库版本钉死可回退；前端纯静态可整目录回滚                   |
+| Separation of Concerns | 图形层(js/) 与数据层(app.py) 与账本层(effect-ledger) 三层单向依赖 |
+
+---
+
+变更记录：v1.0（2026-11-13）立方案，运维负责人令「调研界面图形操作能力相关方案，立适配产品的实现方案」。

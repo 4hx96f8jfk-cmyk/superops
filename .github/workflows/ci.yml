@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install packages
+        run: |
+          uv venv
+          uv pip install -e packages/effect-ledger -e packages/modelhub \
+            -e packages/ops-console -e packages/superops-cli -e .
+          uv pip install pytest
+      - name: Run tests
+        run: uv run --no-sync pytest -q
+
+  leak-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Leak scan
+        run: python tools/leak-scan.py
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, leak-scan]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build wheels
+        run: |
+          for p in effect-ledger modelhub ops-console superops-cli; do
+            uv build "packages/$p"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: dist/

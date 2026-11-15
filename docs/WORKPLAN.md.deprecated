@@ -1,0 +1,112 @@
+# SuperOps 完善工作计划 v1.0（2026-11-13）
+
+> 前提：整体概貌已定（三组件+文稿）。本计划=扣细节，每项带 WHY 与**可实测的验收标准**（自报绿≠实际绿）。
+> 基线实测：测试数以 pytest 实测为准（全仓 pytest 全绿为基线口径，不在文档里钉死具体数字）；双包 wheel 干净 venv 可装可导入；泄露扫描 0 命中；console/CLI 两子代理交付中。
+
+## 总排期（D=工作日，执行代理含子代理并行）
+
+| 阶段 | 内容                         | 量        | 优先级           |
+| ---- | ---------------------------- | --------- | ---------------- |
+| M0   | 发布门禁（CI+仓库骨架）      | 0.5d      | P0               |
+| M1   | effect-ledger 细节硬化       | 1.5d      | P0               |
+| M2   | modelhub 细节硬化            | 1.5d      | P0               |
+| M3   | console 细节（子代理交付后） | 1d        | P0               |
+| M4   | CLI 细节（子代理交付后）     | 0.5d      | P0               |
+| M5   | PyPI 首发                    | 0.5d      | P0（卡运维负责人授权） |
+| M6   | 集成示例库三件               | 2d        | P1               |
+| M7   | 内容系列 4 篇                | 每周 1 篇 | P1               |
+| M8   | recovery 模块抽取            | 2d        | P1               |
+| M9   | 商业化观测与商标             | 持续      | P2               |
+
+---
+
+## M0 发布门禁（push 前必须，WHY：内部信息泄露=不可逆事故；回归=信誉）
+
+- [ ] GitHub Actions 三 job：①pytest（3.11/3.12 矩阵）②泄露扫描 grep 黑名单（`192.168|10.66|.hermes|codingagent|avatar_control_plane|内部人名邮箱`，命中即 fail）③uv build 双包。**验收**：push 后 Actions 首次三绿
+- [ ] 仓骨架四件：CHANGELOG.md（Keep-a-changelog 格式，v0.1.0 条目）、SECURITY.md（漏洞披露到 hongyun@hongyun.dev）、CONTRIBUTING.md（含「机制语义禁顺手改」条款）、issue 模板
+- [ ] GitHub 建仓 `HongYun-Dev/superops`（公开名不带内部代号），main 保护，打 tag `v0.1.0`。**验收**：公开页可访问、Actions 绿
+- **依赖运维负责人**：「发」令 + GitHub 组织确认
+
+## M1 effect-ledger 细节硬化（WHY：核心卖点，细节=护城河）
+
+| #   | 细节                                                                                                               | 验收标准（实测）                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| 1.1 | 连接加固：WAL + `busy_timeout=5000`                                                                                | 双进程并发 begin 各 100 次，0 报错、0 重复 intent                 |
+| 1.2 | schema 版本化：`PRAGMA user_version` + 迁移框架（v1 基线）                                                         | 造 v0 旧库，打开自动迁移到当前版且数据完好                        |
+| 1.3 | 线程安全：内部锁 + 文档声明单连接模型                                                                              | 8 线程混跑 begin/complete 无 crash、状态一致                      |
+| 1.4 | probe 异常隔离：probe 抛异常按 None（探针不可用）处理                                                              | 反例：probe 抛 RuntimeError，reconcile 不崩、低风险保持 UNCERTAIN |
+| 1.5 | PAUSED 人工裁决 API：`resolve(intent_id, approve/reject, note)`——approve→EXECUTING(新 token)；reject→REJECTED 终态 | 状态机迁移表全组合测试；audit 留裁决人/理由                       |
+| 1.6 | 崩溃恢复 e2e：子进程 exit 9 模拟（对齐内部 §8 场景）                                                               | 崩溃→重启→sweep_pending→UNCERTAIN 收口，副作用计数=1              |
+| 1.7 | 结构化日志（stdlib logging，事件名=audit 事件名）                                                                  | caplog 断言关键路径日志                                           |
+| 1.8 | `guard()` 支持 async execute（可选）——**won't-fix**：当前同步执行模型无 async 消费方，引入 anyio 依赖收益为负，如未来出现真实需求再立项 | 不排期 |
+
+## M2 modelhub 细节硬化（WHY：模型接入是运维刚需，流式是 agent 硬需求）
+
+| #   | 细节                                                                               | 验收标准                                            |
+| --- | ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 2.1 | streaming：`chat_stream()` SSE 透传                                                | mock SSE server 分块返回，客户端按序收全            |
+| 2.2 | 探活缓存持久化到 SQLite（TTL 随配置）                                              | 重启进程后缓存命中，不重复探活                      |
+| 2.3 | 错误分类重试：可重试（timeout/429/5xx）vs 不可重试（401/404/400）；指数退避+jitter | 分类表逐类测试；mock 429 两次后成功                 |
+| 2.4 | per-provider timeout（默认 30s）                                                   | mock 慢端点 5s 超时降级到下一家                     |
+| 2.5 | keychain resolve 真实测试（macOS security CLI，本机跑）                            | 存测试密钥进 keychain→resolve 取回一致；CI 跳过标记 |
+| 2.6 | 用量按 provider 聚合 + 成本估算（价格表 config，[数值]依据标注）                   | 聚合数与流水手算一致                                |
+
+## M3 console 细节（子代理交付后验收+补强，WHY：双模式是新红线，细节决定可信）
+
+- [ ] 双模式反例复核：read-only 全部写端点 403；full 每写操作落审计（缺一项打回）
+- [x] 审计防篡改：console_audit 加 `prev_hash` 哈希链（对齐内部哈希链思想）——运维可信的最小成本实现。**验收**：手改一行审计行→链校验断言失败。**已实现**：`app.py` 哈希链（创世哈希起链 + `/api/audit/verify` 全链校验 + 旧库迁移）+ 测试覆盖（篡改行→valid=false 断言）
+- [ ] gate 安全：限流 5 次/分/IP；cookie `HttpOnly+SameSite=Lax`；serve 默认绑 127.0.0.1（`--lan` 才放开 0.0.0.0 并打印警告）
+- [ ] 前端细节：状态色编码（CONFIRMED 绿/UNCERTAIN 黄/PAUSED 红）、pending 角标、10s 自动刷新、移动端不破版
+- [ ] audit 链可视化（intent→事件时间线，替代内部 DAG 的轻量版）→ **升级并入图形操作方案：见 docs/UI-GRAPHIC-OPS-PLAN.md（SUP-GUI-20261113，唯一规范实例）**
+- [ ] 端到端冒烟：起服务→gate 换 cookie→列表→full 模式 resolve→审计可查（脚本化，进 CI）
+
+## M4 CLI 细节（子代理交付后）
+
+- [x] `init --yes` 全非交互（CI 可用）；`doctor --json`（供监控消费）；`serve --mode full` 临时覆盖 config（已实现：click.Choice 覆盖 cfg.mode，不改配置文件）
+- [x] `superops ledger list/pending`（常用查询免开控制台，已实现：直读 effects.db 只查询，`--state/--limit/--json`）
+- [ ] shell 补全（click 自带机制）
+
+## M5 PyPI 首发（卡点：账号凭证=红线，需运维负责人）
+
+- [ ] test.pypi.org 先发双包 → 干净 venv 装 test 包全链冒烟（init→guard 示例→doctor）
+- [ ] 正式 PyPI：`effect-ledger` + `hongyun-modelhub`（发布名查重已做？→ 发前再查）+ `superops-console` + `superops-cli`
+- [ ] 版本策略 semver 写入 CONTRIBUTING；发布=tag+CI 构建（禁手传）
+- **需运维负责人**：PyPI 账号注册/授权 API token（自动化流程不碰密码，走官方 token 机制）
+
+## M6 集成示例库（P1，WHY：外部用户第一问「怎么接我的栈」）
+
+- LangChain `StructuredTool` 包装示例（含 fake 测试）
+- OpenAI function-calling 循环 + guard 示例
+- 裸 HTTP 中间件示例（FastAPI dependency 形态）
+- 每个示例=可跑脚本+pytest，进 CI
+
+## M7 内容系列（P1，每周 1 篇，launch-article 为第 1 篇底稿）
+
+1. 重复下单事故区（已写，补真实开源案例后发）
+2. 反例夹具方法论：怎么测「不该发生第二次」的事
+3. 影子执法：用 48h 影子对账量化误拦率再放闸
+4. 模型接入治理：探活≠可用（内部主机 max_tokens 教训脱敏版）
+
+## M8 recovery 模块抽取（P1，WHY：闭环「检测→恢复→证据」是差异化第二支柱）
+
+- failed-plans 黑名单 + reset-failed 语义从 recovery-loop 抽取（机制原样，同 effect-ledger 流程）
+- 独立复核接口（verifier 回调）+ 哈希链证据
+- 验收：内部 selftest 14 项语义对齐移植，全绿
+
+## M9 商业化观测（P2）
+
+- star/issue/外部 PR 周报 cron（对齐 30 天通过标准 star≥50 或 ≥1 外部集成）
+- 商标 9/42 类查询（正式商用前）；hongyun.dev 子域 `ops.hongyun.dev` 落地页部署（域名已永久授权）
+
+---
+
+## 贯穿铁律
+
+1. 每次 push 前泄露扫描 0 命中（M0 后 CI 强制）
+2. 每项验收必须附实测输出；无证据不核销
+3. 机制语义（重放阻断/fencing/fail-closed/双模式 403）禁顺手改
+4. 禁 rm；改动分批可回滚；子代理产出大哥独立复核
+
+## 待运维负责人（唯一决策点）
+
+**发布授权包**：GitHub 组织名（建议 `HongYun-Dev`）+ PyPI 账号 token。给「发」令即启动 M0→M5 连轴。

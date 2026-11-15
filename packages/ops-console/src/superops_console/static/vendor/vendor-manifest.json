@@ -1,0 +1,25 @@
+{
+  "$schema_note": "vendored 前端库钉死清单——升级=换文件+改本表+git 提交，doctor/测试校验 sha256",
+  "vendored_at": "2026-11-13",
+  "source": "cdn.jsdelivr.net",
+  "files": {
+    "x6.min.js": {
+      "package": "@antv/x6@3.1.8",
+      "license": "MIT",
+      "sha256": "62e3e9a422c4233ccb03a9d8dfbbfd4a1477339fe9ed7209939a645be9475a7a",
+      "purpose": "图编辑引擎（G1 账本 DAG / G3 拓扑）"
+    },
+    "echarts.min.js": {
+      "package": "echarts@6.1.0",
+      "license": "Apache-2.0",
+      "sha256": "b66b25aeb4df84e33199dc21694014d336d222cbd9deb0e5a7c14bd6aa0d0fd0",
+      "purpose": "统计图表（G3 成本 / G4 仪表盘）"
+    },
+    "dagre.min.js": {
+      "package": "dagre@0.8.5",
+      "license": "MIT",
+      "sha256": "62eb9787ccfdbdf4148d4d99d31dbf9ee4770eafee81e637d759b52aac22cd51",
+      "purpose": "DAG 分层自动布局"
+    }
+  }
+}

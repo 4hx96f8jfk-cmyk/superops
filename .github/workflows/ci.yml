@@ -46,7 +46,7 @@ jobs:
       - name: Build wheels
         run: |
           for p in effect-ledger modelhub ops-console superops-cli; do
-            uv build "packages/$p" --out dist
+            uv build "packages/$p" --out-dir dist
           done
       - uses: actions/upload-artifact@v4
         with:

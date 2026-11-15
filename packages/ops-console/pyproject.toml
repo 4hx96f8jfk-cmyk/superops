@@ -12,11 +12,11 @@ requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.110",
   "uvicorn>=0.29",
-  "effect-ledger>=0.1.0",
+  "hongyun-effect-ledger>=0.1.0",
 ]
 
 [project.optional-dependencies]
-modelhub = ["modelhub>=0.1.0"]
+modelhub = ["hongyun-modelhub>=0.1.0"]
 dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]

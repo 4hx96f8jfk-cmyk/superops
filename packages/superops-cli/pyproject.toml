@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
   "click>=8.1",
-  "effect-ledger>=0.1.0",
+  "hongyun-effect-ledger>=0.1.0",
 ]
 
 [project.optional-dependencies]

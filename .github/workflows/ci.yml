@@ -22,10 +22,10 @@ jobs:
         run: |
           uv venv
           uv pip install -e packages/effect-ledger -e packages/modelhub \
-            -e packages/ops-console -e packages/superops-cli -e .
+            -e packages/ops-console -e packages/superops-cli
           uv pip install pytest
       - name: Run tests
-        run: uv run --no-sync pytest -q
+        run: .venv/bin/pytest -q
 
   leak-scan:
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
       - name: Build wheels
         run: |
           for p in effect-ledger modelhub ops-console superops-cli; do
-            uv build "packages/$p"
+            uv build "packages/$p" --out dist
           done
       - uses: actions/upload-artifact@v4
         with:

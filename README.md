@@ -16,13 +16,22 @@ Checkpoints let an agent _remember_. They cannot prove that a command ran, that 
 
 ## Quick start
 
-> Placeholder — packages are being extracted from production code and will be published on PyPI.
-
 ```bash
-# coming soon
+# 主干: uv（可顺带装好 Python，无需本机已有）
+uv tool install superops-cli
+
+# 保底: pip（官方源）
 pip install superops-cli
+
+# 国内加速: 清华镜像
+pip install superops-cli --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
 superops init        # guided setup, SQLite by default, zero external deps
+superops doctor      # 环境自检
+superops update      # 检查新版本（只打印升级命令，绝不自动替换）
 ```
+
+离线环境：从 releases 页下载 wheel bundle，`pip install --no-index --find-links=<bundle目录> superops-cli`。
 
 Expected first flow: wrap one tool (e.g. a "send email" function), register its side effect, crash the process mid-call, restart, and watch the ledger reconcile the `UNCERTAIN` effect against external truth instead of blindly re-running it.
 

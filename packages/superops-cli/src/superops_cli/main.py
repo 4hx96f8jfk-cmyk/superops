@@ -1,6 +1,6 @@
 """superops CLI —— 一键安装体验（PRODUCT.md P0「superops init 向导」）。
 
-命令面：init / status / doctor / serve。
+命令面：init / status / doctor / serve / ledger / update / feedback / evolution。
 铁律：
 - init 幂等——已存在文件绝不覆盖；--force 时旧文件改名 .bak 保留（禁 rm）。
 - token 文件 0600，doctor 校验权限。
@@ -31,6 +31,13 @@ from .config import (
 EXIT_OK = 0
 EXIT_FAIL = 1
 EXIT_WARN = 2
+
+try:  # 安装态取包版本；源码树直跑时降级
+    from importlib.metadata import version as _pkg_version
+
+    __version__ = _pkg_version("superops-cli")
+except Exception:
+    __version__ = "0.1.0+source"
 
 
 # --------------------------------------------------------------------------
@@ -87,6 +94,7 @@ def _resolve(provided: str | None, prompt: str, default: str, yes: bool) -> str:
 # init
 # --------------------------------------------------------------------------
 @click.group(help="HongYun SuperOps — agent 副作用可靠性 + 模型接入治理的运维层。")
+@click.version_option(__version__, prog_name="superops")
 def cli() -> None:
     pass
 
@@ -470,7 +478,9 @@ def ledger() -> None:
 
 
 @ledger.command("list")
-@click.option("--state", default=None, help="按状态过滤（EXECUTING/CONFIRMED/UNCERTAIN/PAUSED）")
+@click.option(
+    "--state", default=None, help="按状态过滤（EXECUTING/CONFIRMED/UNCERTAIN/PAUSED）"
+)
 @click.option("--limit", default=50, type=int, show_default=True, help="最多返回条数")
 @click.option("--json", "as_json", is_flag=True, help="输出机器可读 JSON")
 def ledger_list(state: str | None, limit: int, as_json: bool) -> None:
@@ -481,7 +491,9 @@ def ledger_list(state: str | None, limit: int, as_json: bool) -> None:
         raise click.ClickException(str(exc)) from exc
     items = _ledger_rows(cfg, state, limit)
     if as_json:
-        click.echo(json.dumps({"items": items, "count": len(items)}, ensure_ascii=False))
+        click.echo(
+            json.dumps({"items": items, "count": len(items)}, ensure_ascii=False)
+        )
     elif not items:
         click.echo("（账本为空）")
     else:
@@ -577,8 +589,7 @@ def _warn_non_loopback(host: str) -> None:
         "\n" + "!" * 66 + "\n"
         "!!  警告：控制台绑定在非回环地址 " + host + "，已暴露到局域网！\n"
         "!!  会话 token 是唯一凭据，明文 HTTP 下存在被嗅探/爆破风险。\n"
-        "!!  请确认网络环境可信，或仅在使用完毕后立即关闭服务。\n"
-        + "!" * 66,
+        "!!  请确认网络环境可信，或仅在使用完毕后立即关闭服务。\n" + "!" * 66,
         err=True,
     )
 
@@ -621,6 +632,72 @@ def serve(host: str | None, port: int | None, mode: str | None) -> None:
         _warn_non_loopback(h)
     click.echo(f"监听 http://{h}:{p}")
     run_server(app, h, p)
+
+
+# --------------------------------------------------------------------------
+# update / feedback / evolution（PLAN.md 决策点二/三 + R3 A 形态 stub）
+# --------------------------------------------------------------------------
+@cli.command()
+@click.option("--json", "as_json", is_flag=True, help="机器可读输出")
+def update(as_json: bool) -> None:
+    """检查新版本并打印升级命令——只指引，绝不自动替换（用户主权+气隙友好）。"""
+    from .update import check_latest
+
+    result = check_latest()
+    if as_json:
+        click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    elif not result["ok"]:
+        click.echo(f"[WARN] 版本检查失败: {result['error']}")
+        click.echo("可手动执行: pip install -U superops-cli")
+    elif result["has_update"]:
+        click.echo(
+            f"发现新版本 {result['current']} -> {result['latest']}，升级命令（择一执行）:"
+        )
+        for cmd in result["upgrade_commands"]:
+            click.echo(f"  {cmd}")
+    else:
+        click.echo(f"已是最新版本 {result['current']}")
+    if not result["ok"]:
+        raise SystemExit(EXIT_WARN)
+
+
+@cli.command()
+@click.option("--repo", default=None, help="issue 目标仓库 owner/name（默认官方仓）")
+def feedback(repo: str | None) -> None:
+    """零后端 bug 提交：doctor 诊断包脱敏落盘 + 打印预填 issue 链接。"""
+    from .config import superops_home
+    from .feedback import DEFAULT_REPO, collect_bundle, issue_url, write_bundle
+
+    bundle = collect_bundle()
+    path = write_bundle(superops_home(), bundle)
+    click.echo(f"诊断包已脱敏落盘: {path}")
+    click.echo(f"请核对内容后提交 issue:\n  {issue_url(bundle, repo or DEFAULT_REPO)}")
+    click.echo("完整诊断包可作为附件上传（已脱敏，token/主目录/用户名已清除）。")
+
+
+@cli.group()
+def evolution() -> None:
+    """自进化选配组件（R3 A 形态：接口预留 stub，默认关闭零副作用）。"""
+
+
+@evolution.command("status")
+def evolution_status() -> None:
+    """查看进化适配器状态。引擎本体在内网侧（机制不出内网），产品树内恒为 stub。"""
+    from .config import load_config
+    from .evolution import NoopEvolutionAdapter, evolution_enabled, get_adapter
+
+    try:
+        cfg = load_config()
+        declared = evolution_enabled(cfg.config_path)
+        adapter = get_adapter(cfg.config_path)
+    except ConfigError:
+        declared = False
+        adapter = get_adapter(Path("no-config"))
+    click.echo(f"adapter: {type(adapter).__name__}")
+    click.echo(f"enabled(声明): {declared}")
+    click.echo(f"genome_provider(): {adapter.genome_provider()}")
+    click.echo("说明: 进化引擎属机制本体留内网；产品树内无引擎实现是设计而非缺陷。")
+    assert isinstance(adapter, NoopEvolutionAdapter)  # stub 恒为 Noop（防呆）
 
 
 if __name__ == "__main__":  # pragma: no cover

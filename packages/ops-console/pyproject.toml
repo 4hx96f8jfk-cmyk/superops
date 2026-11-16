@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "HongYun 超级運維智能體（HongYun SuperOps）运维控制台 —— 效果账本可视化 + 双模式（read-only / full）运维操作，全审计留痕"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.110",
   "uvicorn>=0.29",

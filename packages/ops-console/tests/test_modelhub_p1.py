@@ -304,8 +304,12 @@ class TestTrend:
         assert b["end"] - b["start"] == 3600
 
     def test_counts_match_ledger(self, ledger_db):
-        """把 created_at 手动布到两个桶，断言分桶计数与账本一致。"""
-        now = time.time()
+        """把 created_at 手动布到两个桶，断言分桶计数与账本一致。
+
+        时间钉在桶中心（非墙钟 now）：墙钟落在桶边界后 200s 内时，
+        now-200 会跌进上一桶造成确定性假红（2026-11-16 20:02 实测踩中）。
+        """
+        now = time.time() // 3600 * 3600 + 1800
         c = _client(ledger_db)  # 先建 app：console_audit 表由 create_app 初始化
         conn = sqlite3.connect(ledger_db)
         rows = conn.execute(
